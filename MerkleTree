@@ -1,0 +1,175 @@
+import hashlib
+
+class MerkleTreeNode:
+    def __init__(self, left=None, right=None, value=None, description=None, index=None, is_copy=False):
+        self.right = right
+        self.left = left
+        self.value = value
+        self.description = description
+        self.is_copy = is_copy
+        self.index = index
+
+    @staticmethod
+    def hash_data(data):
+        return hashlib.sha3_256(data.encode()).hexdigest()
+
+class MerkleTree:
+    def __init__(self, data):
+        self.root = self.__build_merkle_tree(data, index=0)
+
+    def __build_merkle_tree(self, data, index):
+        nodes = []
+        index=(len(data))
+        for d in data:
+            node = MerkleTreeNode(value=MerkleTreeNode.hash_data(d), description=d, index=index)
+            index += 1
+            if index ==10:
+                index=11
+            nodes.append(node)
+        while len(nodes) > 1:
+            if len(nodes) % 2 != 0:
+                new_node = MerkleTreeNode()
+                new_node = nodes[-1]
+                nodes.append(new_node)
+            new_nodes = []
+            for i in range(0, len(nodes), 2):
+                left = nodes[i]
+                right = nodes[i + 1]
+                value = MerkleTreeNode.hash_data(left.value + right.value)
+                description = f'{left.description}+{right.description}'
+                index = right.index // 2
+                new_node = MerkleTreeNode(left, right, value, description, index)
+                new_nodes.append(new_node)
+            nodes = new_nodes
+        return nodes[0]
+    def give_highest_index(self,node):
+        while node.right is not None:
+            node=node.right
+        return node.index
+        
+
+    def _non_membership_proof(self,data):
+        node=self.root
+        lesser_greater_members=[]
+        highest_index=(self.give_highest_index(node))
+        t_index=data.index-1
+        if data.index> highest_index:
+            return True
+        #lesser_greater_members.append(self.build_non_membership_proof_rec(node, highest_index, []))
+        while t_index > 0:
+            proof = self.build_non_membership_proof_rec(node, t_index, [])
+            if proof[0] == True:
+                lesser_greater_members.append(proof[1])
+                break
+            t_index -= 1
+
+        t_index=data.index+1
+        while t_index <= highest_index:
+            proof = self.build_non_membership_proof_rec(node, t_index, [])
+            if proof[0] == True:
+                lesser_greater_members.append(proof[1])
+                break
+            t_index += 1
+        if(lesser_greater_members[0][(len(lesser_greater_members[0])-3)].value==
+           lesser_greater_members[1][(len(lesser_greater_members[0])-3)].value):
+            return True
+        if(lesser_greater_members[0][0].value==
+           lesser_greater_members[1][0].value):
+            return True
+        
+
+        
+        
+    def build_non_membership_proof_rec(self,node,t_index,path):
+        if node is None:
+            return False, []
+
+        if node.index == t_index:
+            return True, path + [node]
+
+        left_result, left_path = self.build_non_membership_proof_rec(node.left, t_index, path + [node])
+        right_result, right_path = self.build_non_membership_proof_rec(node.right, t_index, path + [node])
+
+        if left_result:
+            return True, left_path
+        elif right_result:
+            return True, right_path
+        else:
+            return False, []
+    def membership_proof (self,path):
+        t_node=self.root
+        result=self.membership_proofrec(t_node,path)
+        if result:
+            return True
+        else:
+            return False
+    def membership_proofrec(self,t_node,path):
+        for i in range(len(path)):
+            if i == (len(path) -1):
+                return True
+            if t_node.value != path[i].value:
+                return False
+            l_node = t_node.left
+            r_node= t_node.right
+            if path[i+1].value == l_node.value:
+                t_node=t_node.left
+            elif path[i+1].value == r_node.value:
+                t_node =t_node.right
+        return False
+    def build_membership_proof(self, data):
+        node=self.root
+        return self.__build_membership_proof_rec(node, data, [])
+    def __build_membership_proof_rec(self, node, data, path):
+        if node is None:
+            return False, []
+
+        if node.value == data.value:
+            return True, path + [node]
+
+        left_result, left_path = self.__build_membership_proof_rec(node.left, data, path + [node])
+        right_result, right_path = self.__build_membership_proof_rec(node.right, data, path + [node])
+
+        if left_result:
+            return True, left_path
+        elif right_result:
+            return True, right_path
+        else:
+            return False, []
+    def print_tree(self):
+        self.__print_tree_rec(self.root)
+    def __print_tree_rec(self, node):
+        if node:
+            if node.left:
+                print("Left: " + str(node.left.value))
+                print("Right: " + str(node.right.value))
+            else:
+                print("Input")
+            if node.is_copy:
+                print('(Padding)')
+            print("Value: " + str(node.value))
+            print("Content: " + str(node.description))
+            print("Index:" + str(node.index))
+            print("")
+            self.__print_tree_rec(node.left)
+            self.__print_tree_rec(node.right)
+    def get_root_hash(self):
+        return self.root.value
+
+# Load data from a file
+words_l = []
+with open('C:\\large_text_file.txt', 'r') as file:
+    for line in file:
+        word = line.strip()
+        words_l.append(word)
+
+mtree = MerkleTree(words_l)
+#mtree.print_tree()
+data_to_check = MerkleTreeNode(value=MerkleTreeNode.hash_data("g"), description="g", index=10)
+result = mtree._non_membership_proof(data_to_check)
+print("Is Not Member:", result)
+# result2, path = mtree.build_membership_proof(data_to_check)
+# res=mtree.membership_proof(path)
+# print("Is Member:", res)
+# print("Membership Path:")
+# for node in path:
+    #  print(node.value, node.description)
